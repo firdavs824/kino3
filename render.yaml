@@ -1,13 +1,11 @@
 services:
   - type: web
-    name: kino-telegram-bot
+    name: kino3
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       - key: BOT_TOKEN
-        sync: false
+        value: 8663351252:AAGV_vQBcybibET7upszRwMFD0-mS55IMsY
       - key: ADMIN_PASSWORD
-        sync: false
-      - key: ADMIN_IDS
-        sync: false
+        value: davlat20102412
