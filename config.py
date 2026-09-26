@@ -1,4 +1,4 @@
- import os
+import os
 import re
 
 DEFAULT_BOT_TOKEN = "8663351252:AAGV_vQBcybibET7upszRwMFD0-mS55IMsY"
@@ -18,6 +18,7 @@ def clean_token(token: str) -> str:
 
 BOT_TOKEN = clean_token(raw_token)
 
+# Birlamchi Admin ID lari (agar bilsangiz shu yerga kiritishingiz mumkin yoki ADMIN_IDS muhit o'zgaruvchisi orqali)
 INITIAL_ADMINS = []
 admin_ids_env = os.getenv("ADMIN_IDS", "")
 if admin_ids_env:
@@ -26,6 +27,7 @@ if admin_ids_env:
     except Exception:
         pass
 
+# Admin bo'lish uchun maxfiy parol
 raw_pwd = os.getenv("ADMIN_PASSWORD", "davlat20102412")
 if raw_pwd:
     p = raw_pwd.strip().strip('"').strip("'")
