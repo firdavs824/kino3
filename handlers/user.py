@@ -15,9 +15,6 @@ def is_user_admin(user_id: int) -> bool:
 
 async def check_user_subscription(bot: Bot, user_id: int) -> bool:
     """Foydalanuvchi barcha majburiy kanallarga a'zo bo'lganligini tekshirish."""
-    if is_user_admin(user_id):
-        return True
-
     channels = db.get_all_channels()
     if not channels:
         return True
@@ -27,10 +24,21 @@ async def check_user_subscription(bot: Bot, user_id: int) -> bool:
             chan_id_str = str(c["channel_id"]).strip()
             chat_id = int(chan_id_str) if chan_id_str.lstrip("-").isdigit() else chan_id_str
             member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
-            if member.status not in ["creator", "administrator", "member", "restricted"]:
+            if member.status in ["creator", "administrator", "member"]:
+                continue
+            elif member.status == "restricted":
+                if getattr(member, "is_member", True):
+                    continue
                 return False
-        except Exception:
-            # Agar bot kanalga admin qilinmagan bo'lsa yoki xatolik bo'lsa tekshiruvdan o'tkaziladi
+            else:
+                return False
+        except Exception as e:
+            err_msg = str(e).lower()
+            # Agar foydalanuvchi kanalda topilmasa (obuna bo'lmagan)
+            if "user not found" in err_msg or "participant" in err_msg:
+                return False
+            # Boshqa xatoliklar (masalan, bot kanalda admin emasligi)
+            print(f"⚠️ [OGOHLANTIRISH] Kanal obunasi tekshirishda xatolik ({c.get('channel_name')}): {e}")
             continue
 
     return True
@@ -86,14 +94,20 @@ async def start_handler(message: types.Message, command: CommandObject = None):
     # Bazaga foydalanuvchini qo'shish
     db.add_user(user_id=user_id, full_name=full_name, username=username)
 
-    # Deep linking orqali kelgan bo'lsa (masalan: /start 15)
+    channels = db.get_all_channels()
     args = command.args if command else None
-    if args:
-        code = args.strip().lower()
-        if not await check_user_subscription(message.bot, user_id):
-            await prompt_subscription(message, movie_code=code)
+    target_code = args.strip().lower() if args else "main"
+
+    # 1-chi start tugmasi bosilgandayoq majburiy obunani tekshirish
+    if channels:
+        is_sub = await check_user_subscription(message.bot, user_id)
+        if not is_sub:
+            await prompt_subscription(message, movie_code=target_code)
             return
 
+    # Deep linking orqali kelgan bo'lsa (masalan: /start 15)
+    if args:
+        code = args.strip().lower()
         movie = db.get_movie(code)
         if movie:
             await send_movie_to_user(message.bot, message.chat.id, movie)
@@ -104,11 +118,7 @@ async def start_handler(message: types.Message, command: CommandObject = None):
                 f"💡 Kodni to'g'ri kiritganingizga ishonch hosil qiling.",
                 parse_mode="HTML"
             )
-
-    # Majburiy obuna tekshiruvi
-    if not await check_user_subscription(message.bot, user_id):
-        await prompt_subscription(message, movie_code="main")
-        return
+            return
 
     admin_status = is_user_admin(user_id)
     menu = admin_menu if admin_status else user_menu
@@ -122,6 +132,8 @@ async def start_handler(message: types.Message, command: CommandObject = None):
 
     if admin_status:
         welcome_text += "\n\n⭐️ <i>Siz administrator ekansiz. Admin panel orqali kino yuklashingiz mumkin.</i>"
+        if not channels:
+            welcome_text += "\n\n⚠️ <b>Eslatma (Admin uchun):</b> Hozircha majburiy obuna uchun kanallar qo'shilmagan! Foydalanuvchilardan obuna so'ralishi uchun <b>«📢 Kanallarni boshqarish»</b> bo'limi orqali kanallaringizni qo'shing."
 
     await message.answer(welcome_text, reply_markup=menu, parse_mode="HTML")
 
